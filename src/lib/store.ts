@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
 import { addDaysToDate } from "@/lib/utils";
 import type {
@@ -21,6 +21,7 @@ import type {
 import {
   buildInitialDays,
   buildInitialJournal,
+  DEFAULT_DEPARTURE,
   defaultSettings,
   initialAttractions,
   initialExpenses,
@@ -30,6 +31,92 @@ import {
   initialTransport,
   initialWishlist,
 } from "@/lib/seed";
+
+const CURRENT_STORAGE_KEY = "japan-trip-planner-v2";
+const LEGACY_STORAGE_KEYS = ["japan-trip-planner-v1"];
+
+function daysBetweenDates(fromISO: string, toISO: string): number {
+  const from = new Date(fromISO + "T00:00:00").getTime();
+  const to = new Date(toISO + "T00:00:00").getTime();
+  return Math.round((to - from) / 86400000);
+}
+
+/**
+ * Recovers state from a previous storage key (e.g. after the schema/date
+ * baseline changed) and shifts every date field by the same offset so a
+ * user's real edits survive instead of being silently orphaned.
+ */
+function recoverLegacyState(raw: string): string | null {
+  let parsed: { state?: Record<string, unknown>; version?: number };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const state = parsed.state;
+  if (!state || typeof state !== "object") return null;
+
+  const settings = state.settings as Partial<TripSettings> | undefined;
+  const oldDeparture = settings?.departureDate;
+  const shiftDays =
+    typeof oldDeparture === "string" ? daysBetweenDates(oldDeparture, DEFAULT_DEPARTURE) : 0;
+  const shift = (d: unknown) =>
+    typeof d === "string" && d ? addDaysToDate(d, shiftDays) : d;
+
+  if (settings) {
+    state.settings = {
+      ...settings,
+      departureDate: shift(settings.departureDate),
+      returnDate: shift(settings.returnDate),
+      jrPassExpiry: shift(settings.jrPassExpiry),
+    };
+  }
+  if (Array.isArray(state.days)) {
+    state.days = state.days.map((d: DayPlan) => ({ ...d, date: shift(d.date) }));
+  }
+  if (Array.isArray(state.hotels)) {
+    state.hotels = state.hotels.map((h: HotelBooking) => ({
+      ...h,
+      checkIn: shift(h.checkIn),
+      checkOut: shift(h.checkOut),
+    }));
+  }
+  if (Array.isArray(state.expenses)) {
+    state.expenses = state.expenses.map((e: ExpenseItem) => ({ ...e, date: shift(e.date) }));
+  }
+  if (Array.isArray(state.transport)) {
+    state.transport = state.transport.map((t: TransportLeg) => ({ ...t, date: shift(t.date) }));
+  }
+  if (Array.isArray(state.journal)) {
+    state.journal = state.journal.map((j: JournalEntry) => ({ ...j, date: shift(j.date) }));
+  }
+
+  return JSON.stringify({ ...parsed, state });
+}
+
+const recoveringStorage = {
+  getItem: (name: string): string | null => {
+    if (typeof window === "undefined") return null;
+    const current = window.localStorage.getItem(name);
+    if (current) return current;
+    for (const legacyKey of LEGACY_STORAGE_KEYS) {
+      const legacyRaw = window.localStorage.getItem(legacyKey);
+      if (!legacyRaw) continue;
+      const recovered = recoverLegacyState(legacyRaw);
+      if (recovered) {
+        window.localStorage.setItem(name, recovered);
+        return recovered;
+      }
+    }
+    return null;
+  },
+  setItem: (name: string, value: string) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(name, value);
+  },
+  removeItem: (name: string) => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(name);
+  },
+};
 
 interface TripState {
   hydrated: boolean;
@@ -355,7 +442,8 @@ export const useTripStore = create<TripState>()(
       resetTrip: () => set({ ...freshState() }),
     }),
     {
-      name: "japan-trip-planner-v2",
+      name: CURRENT_STORAGE_KEY,
+      storage: createJSONStorage(() => recoveringStorage),
       skipHydration: true,
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
