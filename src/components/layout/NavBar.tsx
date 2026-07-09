@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTripStore } from "@/lib/store";
 import GlobalSearch from "@/components/search/GlobalSearch";
+import BackupControls from "@/components/layout/BackupControls";
 import { Moon, Sun, Search, Menu, X } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -64,6 +65,7 @@ export default function NavBar() {
 
           <div className="flex-1 md:hidden" />
 
+          <BackupControls />
           <button
             onClick={() => setSearchOpen(true)}
             className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"

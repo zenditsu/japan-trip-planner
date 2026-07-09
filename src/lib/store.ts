@@ -187,6 +187,7 @@ interface TripState {
   removeTransportLeg: (id: string) => void;
 
   resetTrip: () => void;
+  restoreFromBackup: (data: Record<string, unknown>) => void;
 }
 
 function freshState() {
@@ -448,6 +449,7 @@ export const useTripStore = create<TripState>()(
         set((s) => ({ transport: s.transport.filter((t) => t.id !== id) })),
 
       resetTrip: () => set({ ...freshState() }),
+      restoreFromBackup: (data) => set((s) => ({ ...s, ...data, hydrated: true })),
     }),
     {
       name: CURRENT_STORAGE_KEY,
