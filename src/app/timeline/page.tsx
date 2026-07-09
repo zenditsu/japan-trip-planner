@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { DragDropContext, DropResult } from "@hello-pangea/dnd";
+import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { useTripStore } from "@/lib/store";
 import PageHeader from "@/components/ui/PageHeader";
 import DayCard from "@/components/timeline/DayCard";
@@ -14,11 +14,13 @@ const TimelineScene = dynamic(() => import("@/components/timeline/TimelineScene"
 });
 
 const CITY_FILTERS = ["All", "Tokyo", "Kyoto", "Osaka", "Travel"] as const;
+const DAY_ORDER_TYPE = "DAY";
 
 export default function TimelinePage() {
   const days = useTripStore((s) => s.days);
   const reorderScheduleItem = useTripStore((s) => s.reorderScheduleItem);
   const moveScheduleItem = useTripStore((s) => s.moveScheduleItem);
+  const reorderDays = useTripStore((s) => s.reorderDays);
   const [filter, setFilter] = useState<(typeof CITY_FILTERS)[number]>("All");
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -27,9 +29,19 @@ export default function TimelinePage() {
     [days, filter]
   );
 
+  const canReorderDays = filter === "All";
+
   function onDragEnd(result: DropResult) {
-    const { source, destination, draggableId } = result;
+    const { source, destination, draggableId, type } = result;
     if (!destination) return;
+
+    if (type === DAY_ORDER_TYPE) {
+      if (source.index !== destination.index) {
+        reorderDays(source.index, destination.index);
+      }
+      return;
+    }
+
     if (source.droppableId === destination.droppableId) {
       reorderScheduleItem(source.droppableId, source.index, destination.index);
     } else {
@@ -57,7 +69,7 @@ export default function TimelinePage() {
         <PageHeader
           eyebrow="Day by day"
           title="15-Day Timeline"
-          subtitle="Every day of the trip, fully editable. Drag activities between days, duplicate, color-code, or delete freely."
+          subtitle="Every day of the trip, fully editable. Drag the grip handle to reorder whole days, or drag activities between days, duplicate, color-code, or delete freely."
           action={<ExportButtons targetRef={printRef} filename="japan-itinerary.pdf" />}
         />
 
@@ -77,6 +89,11 @@ export default function TimelinePage() {
             </button>
           ))}
         </div>
+        {!canReorderDays && (
+          <p className="text-xs text-foreground/40 mb-4 no-print">
+            Switch back to &ldquo;All&rdquo; to drag and reorder whole days.
+          </p>
+        )}
 
         <div
           ref={printRef}
@@ -91,15 +108,50 @@ export default function TimelinePage() {
           }
         >
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className="relative flex flex-col gap-5">
-              <div
-                className="absolute left-7 top-0 bottom-0 w-px bg-[var(--border)] hidden sm:block no-print"
-                aria-hidden
-              />
-              {visibleDays.map((day, i) => (
-                <DayCard key={day.id} dayId={day.id} defaultOpen={i === 0} />
-              ))}
-            </div>
+            {canReorderDays ? (
+              <Droppable droppableId="day-order" type={DAY_ORDER_TYPE}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="relative flex flex-col gap-5"
+                  >
+                    <div
+                      className="absolute left-7 top-0 bottom-0 w-px bg-[var(--border)] hidden sm:block no-print"
+                      aria-hidden
+                    />
+                    {visibleDays.map((day, i) => (
+                      <Draggable key={day.id} draggableId={day.id} index={i}>
+                        {(dragProvided, dragSnapshot) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            className={dragSnapshot.isDragging ? "ring-2 ring-accent rounded-3xl" : ""}
+                          >
+                            <DayCard
+                              dayId={day.id}
+                              defaultOpen={i === 0}
+                              dragHandleProps={dragProvided.dragHandleProps}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            ) : (
+              <div className="relative flex flex-col gap-5">
+                <div
+                  className="absolute left-7 top-0 bottom-0 w-px bg-[var(--border)] hidden sm:block no-print"
+                  aria-hidden
+                />
+                {visibleDays.map((day, i) => (
+                  <DayCard key={day.id} dayId={day.id} defaultOpen={i === 0} />
+                ))}
+              </div>
+            )}
           </DragDropContext>
         </div>
       </div>

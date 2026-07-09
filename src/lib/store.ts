@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
+import { addDaysToDate } from "@/lib/utils";
 import type {
   Attraction,
   ChecklistItem,
@@ -49,6 +50,7 @@ interface TripState {
   updateSettings: (partial: Partial<TripSettings>) => void;
 
   updateDay: (id: string, partial: Partial<DayPlan>) => void;
+  reorderDays: (fromIndex: number, toIndex: number) => void;
   addChecklistItem: (dayId: string, text: string) => void;
   toggleChecklistItem: (dayId: string, itemId: string) => void;
   removeChecklistItem: (dayId: string, itemId: string) => void;
@@ -124,6 +126,20 @@ export const useTripStore = create<TripState>()(
         set((s) => ({
           days: s.days.map((d) => (d.id === id ? { ...d, ...partial } : d)),
         })),
+
+      reorderDays: (fromIndex, toIndex) =>
+        set((s) => {
+          const days = [...s.days];
+          const [moved] = days.splice(fromIndex, 1);
+          days.splice(toIndex, 0, moved);
+          return {
+            days: days.map((d, i) => ({
+              ...d,
+              dayNumber: i + 1,
+              date: addDaysToDate(s.settings.departureDate, i),
+            })),
+          };
+        }),
 
       addChecklistItem: (dayId, text) =>
         set((s) => ({
@@ -339,7 +355,7 @@ export const useTripStore = create<TripState>()(
       resetTrip: () => set({ ...freshState() }),
     }),
     {
-      name: "japan-trip-planner-v1",
+      name: "japan-trip-planner-v2",
       skipHydration: true,
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();

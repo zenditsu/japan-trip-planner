@@ -27,6 +27,12 @@ export function formatDateShort(dateISO: string): string {
   });
 }
 
+export function addDaysToDate(baseISO: string, offset: number): string {
+  const d = new Date(baseISO + "T00:00:00");
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
 export function googleMapsSearchUrl(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     query

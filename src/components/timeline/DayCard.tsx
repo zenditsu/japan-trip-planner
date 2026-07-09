@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import { useTripStore } from "@/lib/store";
 import { EditableText, EditableTextArea, EditableNumber } from "@/components/ui/Editable";
 import TagList from "@/components/ui/TagList";
@@ -21,6 +22,7 @@ import {
   ShoppingBag,
   Plus,
   Trash2,
+  GripVertical,
 } from "lucide-react";
 
 const CITIES: (CityName | "Travel")[] = ["Tokyo", "Kyoto", "Osaka", "Travel"];
@@ -32,7 +34,15 @@ const PRIORITY_COLOR: Record<Priority, string> = {
 };
 const WEATHER_ICONS = ["☀️", "⛅", "☁️", "🌧️", "❄️", "🌸", "🍂"];
 
-export default function DayCard({ dayId, defaultOpen = false }: { dayId: string; defaultOpen?: boolean }) {
+export default function DayCard({
+  dayId,
+  defaultOpen = false,
+  dragHandleProps,
+}: {
+  dayId: string;
+  defaultOpen?: boolean;
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
+}) {
   const day = useTripStore((s) => s.days.find((d) => d.id === dayId));
   const updateDay = useTripStore((s) => s.updateDay);
   const addChecklistItem = useTripStore((s) => s.addChecklistItem);
@@ -55,6 +65,16 @@ export default function DayCard({ dayId, defaultOpen = false }: { dayId: string;
         onClick={() => setOpen((v) => !v)}
         className="w-full flex flex-wrap items-center gap-3 sm:gap-4 p-5 sm:p-6 text-left"
       >
+        {dragHandleProps && (
+          <span
+            {...dragHandleProps}
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 self-start sm:self-center text-foreground/25 hover:text-accent cursor-grab active:cursor-grabbing -ml-1 mt-2 sm:mt-0"
+            title="Drag to reorder day"
+          >
+            <GripVertical size={18} />
+          </span>
+        )}
         <span
           className="font-display text-2xl sm:text-3xl shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center text-white"
           style={{ background: cityColor }}

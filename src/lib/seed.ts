@@ -13,7 +13,7 @@ import type {
   WishlistItem,
 } from "@/types";
 
-export const DEFAULT_DEPARTURE = "2026-10-10";
+export const DEFAULT_DEPARTURE = "2026-07-10";
 
 function dayDate(offset: number, base: string = DEFAULT_DEPARTURE): string {
   return format(addDays(new Date(base + "T00:00:00"), offset), "yyyy-MM-dd");
