@@ -94,21 +94,29 @@ function recoverLegacyState(raw: string): string | null {
   return JSON.stringify({ ...parsed, state });
 }
 
+const MIGRATION_ATTEMPTED_FLAG = "japan-trip-planner-migrated-v1-to-v2";
+
 const recoveringStorage = {
   getItem: (name: string): string | null => {
     if (typeof window === "undefined") return null;
-    const current = window.localStorage.getItem(name);
-    if (current) return current;
-    for (const legacyKey of LEGACY_STORAGE_KEYS) {
-      const legacyRaw = window.localStorage.getItem(legacyKey);
-      if (!legacyRaw) continue;
-      const recovered = recoverLegacyState(legacyRaw);
-      if (recovered) {
-        window.localStorage.setItem(name, recovered);
-        return recovered;
+
+    // Run the legacy recovery exactly once, even if the new key already has
+    // data — a prior deploy may have already reseeded it with fresh defaults
+    // before this recovery logic existed, burying the user's real edits.
+    if (!window.localStorage.getItem(MIGRATION_ATTEMPTED_FLAG)) {
+      window.localStorage.setItem(MIGRATION_ATTEMPTED_FLAG, "1");
+      for (const legacyKey of LEGACY_STORAGE_KEYS) {
+        const legacyRaw = window.localStorage.getItem(legacyKey);
+        if (!legacyRaw) continue;
+        const recovered = recoverLegacyState(legacyRaw);
+        if (recovered) {
+          window.localStorage.setItem(name, recovered);
+          return recovered;
+        }
       }
     }
-    return null;
+
+    return window.localStorage.getItem(name);
   },
   setItem: (name: string, value: string) => {
     if (typeof window !== "undefined") window.localStorage.setItem(name, value);
